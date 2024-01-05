@@ -40,7 +40,16 @@ Data was obtained from the ENTSO-E Transparency portal (https://transparency.ent
 ### Installation and Usage
 1. Clone the repository.
 2. Install dependencies: `pip install -r requirements.txt`.
-3. Run `bash scripts/run_pipeline.sh` to execute the full pipeline.
+3. **Using Docker (Recommended)**
+   - Build the Docker image: `docker build -t entsoe_pipeline_image .`
+   - Run the Docker container, passing the necessary environment variables for API access:
+     ```
+     docker run -e ENTSOE_API_URL=https://web-api.tp.entsoe.eu/api -e ENTSOE_SECURITY_TOKEN=your_security_token entsoe_pipeline_image
+     ```
+     Replace `your_security_token` with your actual ENTSO-E Transparency portal security token.
+4. **Without Docker**
+   - Ensure `pipeline.conf` is configured with the correct API URL and security token.
+   - Run `bash scripts/run_pipeline.sh` to execute the full pipeline. The script will automatically use the configuration from `pipeline.conf` if environment variables are not set.
 
 ### Contributions
 This project is a result of collaborative efforts for the Schneider Electric Hackathon. Feel free to fork, modify, and use the project in compliance with the provided license.
