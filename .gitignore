@@ -2,3 +2,5 @@
 .src/__pycache__
 .jupyter_notebook/.ipynb_checkpoints
 .jupyter_notebook/data_samples
+credentials.conf
+repo_structure.txt
