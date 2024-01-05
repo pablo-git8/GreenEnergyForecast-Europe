@@ -1,83 +1,124 @@
 import argparse
-import datetime
 import pandas as pd
+import configparser
+import os
 from utils import perform_get_request, xml_to_load_dataframe, xml_to_gen_data
+from datetime import datetime, timedelta
+
 
 def get_load_data_from_entsoe(regions, periodStart='202302240000', periodEnd='202303240000', output_path='./data'):
     
-    # TODO: There is a period range limit of 1 year for this API. Process in 1 year chunks if needed
-    
-    # URL of the RESTful API
-    url = 'https://web-api.tp.entsoe.eu/api'
+    # Try to get API details from environment variables first
+    api_url = os.getenv('ENTSOE_API_URL')
+    securityToken = os.getenv('ENTSOE_SECURITY_TOKEN')
 
-    # General parameters for the API
-    # Refer to https://transparency.entsoe.eu/content/static_content/Static%20content/web%20api/Guide.html#_documenttype
-    params = {
-        'securityToken': '1d9cd4bd-f8aa-476c-8cc1-3442dc91506d',
-        'documentType': 'A65',
-        'processType': 'A16',
-        'outBiddingZone_Domain': 'FILL_IN', # used for Load data
-        'periodStart': periodStart, # in the format YYYYMMDDHHMM
-        'periodEnd': periodEnd # in the format YYYYMMDDHHMM
-    }
+    # If environment variables are not set, fall back to the pipeline.conf file
+    if not api_url or not securityToken:
+        parser = configparser.ConfigParser()
+        parser.read("../pipeline.conf")
+        api_url = parser.get("entsoe_api_config", "api_url")  # URL of the RESTful API
+        securityToken = parser.get("entsoe_api_config", "securityToken")
 
-    # Loop through the regions and get data for each region
+    # Convert string dates to datetime objects
+    start_date = datetime.strptime(periodStart, '%Y%m%d%H%M')
+    end_date = datetime.strptime(periodEnd, '%Y%m%d%H%M')
 
-    for region, area_code in regions.items():
+    # Reading data in chunks
+    while start_date < end_date:
+        chunk_end_date = min(start_date + timedelta(days=365), end_date)
+        chunk_start_str = start_date.strftime('%Y%m%d%H%M')
+        chunk_end_str = chunk_end_date.strftime('%Y%m%d%H%M')
 
-        print(f'Fetching data for {region}...')
-        params['outBiddingZone_Domain'] = area_code
-    
-        # Use the requests library to get data from the API for the specified time range
-        response_content = perform_get_request(url, params)
+        # General parameters for the API
+        # Refer to https://transparency.entsoe.eu/content/static_content/Static%20content/web%20api/Guide.html#_documenttype
+        params = {
+            'securityToken': securityToken,
+            'documentType': 'A65',
+            'processType': 'A16',
+            'outBiddingZone_Domain': 'FILL_IN', # used for Load data
+            'periodStart': chunk_start_str, # in the format YYYYMMDDHHMM
+            'periodEnd': chunk_end_str # in the format YYYYMMDDHHMM
+        }
 
-        # Response content is a string of XML data
-        df = xml_to_load_dataframe(response_content)
-        # Save the DataFrame to a CSV file
-        df.to_csv(f'{output_path}/load_{region}.csv', index=False)
-       
+        # Loop through the regions and get data for each region
+        for region, area_code in regions.items():
+
+            print(f'Fetching data for {region}...')
+            params['outBiddingZone_Domain'] = area_code
+        
+            # Use the requests library to get data from the API for the specified time range
+            response_content = perform_get_request(api_url, params)
+
+            # Response content is a string of XML data
+            df = xml_to_load_dataframe(response_content)
+            # Save the DataFrame to a CSV file
+            df.to_csv(f'{output_path}/load_{region}.csv', index=False)
+        
+        # Update start_date for next iteration
+        start_date = chunk_end_date
+
     return
+
 
 def get_gen_data_from_entsoe(regions, periodStart='202302240000', periodEnd='202303240000', output_path='./data'):
     
-    # TODO: There is a period range limit of 1 day for this API. Process in 1 day chunks if needed
+    # Try to get API details from environment variables first
+    api_url = os.getenv('ENTSOE_API_URL')
+    securityToken = os.getenv('ENTSOE_SECURITY_TOKEN')
 
-    # URL of the RESTful API
-    url = 'https://web-api.tp.entsoe.eu/api'
+    # If environment variables are not set, fall back to the pipeline.conf file
+    if not api_url or not securityToken:
+        parser = configparser.ConfigParser()
+        parser.read("../pipeline.conf")
+        api_url = parser.get("entsoe_api_config", "api_url")  # URL of the RESTful API
+        securityToken = parser.get("entsoe_api_config", "securityToken")
 
-    # General parameters for the API
-    params = {
-        'securityToken': '1d9cd4bd-f8aa-476c-8cc1-3442dc91506d',
-        'documentType': 'A75',
-        'processType': 'A16',
-        'outBiddingZone_Domain': 'FILL_IN', # used for Load data
-        'in_Domain': 'FILL_IN', # used for Generation data
-        'periodStart': periodStart, # in the format YYYYMMDDHHMM
-        'periodEnd': periodEnd # in the format YYYYMMDDHHMM
-    }
-
-    # Loop through the regions and get data for each region
-    for region, area_code in regions.items():
-        print(f'Fetching data for {region}...')
-        params['outBiddingZone_Domain'] = area_code
-        params['in_Domain'] = area_code
+    # Convert string dates to datetime objects
+    start_date = datetime.strptime(periodStart, '%Y%m%d%H%M')
+    end_date = datetime.strptime(periodEnd, '%Y%m%d%H%M')
     
-        # Use the requests library to get data from the API for the specified time range
-        response_content = perform_get_request(url, params)
+    # Reading data in chunks
+    while start_date < end_date:
+        chunk_end_date = min(start_date + timedelta(days=1), end_date)
+        chunk_start_str = start_date.strftime('%Y%m%d%H%M')
+        chunk_end_str = chunk_end_date.strftime('%Y%m%d%H%M')
 
-        # Response content is a string of XML data
-        dfs = xml_to_gen_data(response_content)
+        # General parameters for the API
+        params = {
+            'securityToken': securityToken,
+            'documentType': 'A75',
+            'processType': 'A16',
+            'outBiddingZone_Domain': 'FILL_IN', # used for Load data
+            'in_Domain': 'FILL_IN', # used for Generation data
+            'periodStart': chunk_start_str, # in the format YYYYMMDDHHMM
+            'periodEnd': chunk_end_str # in the format YYYYMMDDHHMM
+        }
 
-        # Save the dfs to CSV files
-        for psr_type, df in dfs.items():
-            # Save the DataFrame to a CSV file
-            df.to_csv(f'{output_path}/gen_{region}_{psr_type}.csv', index=False)
+        # Loop through the regions and get data for each region
+        for region, area_code in regions.items():
+            print(f'Fetching data for {region}...')
+            params['outBiddingZone_Domain'] = area_code
+            params['in_Domain'] = area_code
+        
+            # Use the requests library to get data from the API for the specified time range
+            response_content = perform_get_request(api_url, params)
+
+            # Response content is a string of XML data
+            dfs = xml_to_gen_data(response_content)
+
+            # Save the dfs to CSV files
+            for psr_type, df in dfs.items():
+                # Save the DataFrame to a CSV file
+                df.to_csv(f'{output_path}/gen_{region}_{psr_type}.csv', index=False)
+        
+        # Update start_date for next iteration
+        start_date = chunk_end_date
     
     return
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description='Data ingestion script for Energy Forecasting Hackathon')
+    parser = argparse.ArgumentParser(description='Data ingestion script for Energy Forecasting')
     parser.add_argument(
         '--start_time', 
         type=lambda s: datetime.datetime.strptime(s, '%Y-%m-%d'), 
@@ -97,6 +138,7 @@ def parse_arguments():
         help='Name of the output file'
     )
     return parser.parse_args()
+
 
 def main(start_time, end_time, output_path):
     
@@ -121,6 +163,7 @@ def main(start_time, end_time, output_path):
 
     # Get Generation data from ENTSO-E
     get_gen_data_from_entsoe(regions, start_time, end_time, output_path)
+
 
 if __name__ == "__main__":
     args = parse_arguments()
